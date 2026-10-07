@@ -1,0 +1,16 @@
+name: perch
+title: PERCH — Passive Environmental Radio Census & Habitat
+author: Saksham Sud
+boards:
+  - shrike-fi
+uses_fpga: optional
+tags:
+  - wifi
+  - promiscuous
+  - environmental-audit
+  - management-frames
+  - receive-only
+summary: >
+  Standalone receive-only 802.11 management-frame auditor for Shrike-fi.
+  Channel census, beacon inventory, and salted station counts.
+  No association, no scan, no transmit path.

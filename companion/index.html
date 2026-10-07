@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PERCH — ShrikeFi census</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <div>
+      <p class="kicker">Vicharak ShrikeFi · receive only</p>
+      <h1>PERCH</h1>
+      <p class="lede">Management-frame census. No association, no scan, no transmit.</p>
+    </div>
+    <button id="connect" type="button">Connect</button>
+  </header>
+  <p class="note">Survey a place you are allowed to observe. Addresses on the wire are salted hashes, not MACs.</p>
+  <section class="stats">
+    <div><span>Channel</span><strong id="ch">–</strong></div>
+    <div><span>Mgmt / s</span><strong id="rate">–</strong></div>
+    <div><span>Beacons</span><strong id="beacons">–</strong></div>
+    <div><span>Probes</span><strong id="probes">–</strong></div>
+    <div><span>Stations</span><strong id="stations">–</strong></div>
+  </section>
+  <table>
+    <thead>
+      <tr><th>SSID</th><th>Ch</th><th>RSSI</th><th>Flags</th></tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <p id="status" class="status">Not connected.</p>
+  <script src="app.js"></script>
+</body>
+</html>
