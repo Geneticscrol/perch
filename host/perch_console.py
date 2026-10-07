@@ -46,6 +46,13 @@ def handle(obj: dict, ssids: dict) -> None:
         f"beacons {obj.get('beacons')}  probes {obj.get('probes')}  "
         f"stations {obj.get('stations')}"
     )
+    counts = obj.get("ch_counts") or []
+    if counts:
+        peak = max(counts) or 1
+        bar = " ".join(
+            f"{i + 1}:{int(8 * n / peak) * '|' or '.'}" for i, n in enumerate(counts)
+        )
+        print(f"  dwell  {bar}")
     print(f"  {'SSID':<24} {'ch':>3} {'rssi':>5}  flags")
     for row in sorted(ssids.values(), key=lambda r: r.get("rssi") or -127, reverse=True):
         name = row.get("ssid") or "(hidden)"

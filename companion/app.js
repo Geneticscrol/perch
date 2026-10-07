@@ -1,10 +1,27 @@
 const connectBtn = document.getElementById("connect");
 const statusEl = document.getElementById("status");
 const rowsEl = document.getElementById("rows");
+const barsEl = document.getElementById("bars");
 const ssids = new Map();
 
 function setStatus(text) {
   statusEl.textContent = text;
+}
+
+function renderBars(counts) {
+  if (!Array.isArray(counts) || !counts.length) return;
+  const max = Math.max(1, ...counts);
+  barsEl.replaceChildren();
+  counts.forEach((n, i) => {
+    const col = document.createElement("div");
+    const bar = document.createElement("i");
+    bar.style.height = `${Math.max(2, Math.round((n / max) * 72))}px`;
+    const label = document.createElement("span");
+    label.textContent = String(i + 1);
+    col.appendChild(bar);
+    col.appendChild(label);
+    barsEl.appendChild(col);
+  });
 }
 
 function render(obj) {
@@ -13,6 +30,7 @@ function render(obj) {
   document.getElementById("beacons").textContent = obj.beacons ?? "–";
   document.getElementById("probes").textContent = obj.probes ?? "–";
   document.getElementById("stations").textContent = obj.stations ?? "–";
+  renderBars(obj.ch_counts);
   for (const row of obj.ssids || []) {
     ssids.set(row.bss || row.ssid || "?", row);
   }

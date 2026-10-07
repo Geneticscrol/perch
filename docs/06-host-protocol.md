@@ -7,7 +7,7 @@ Transport is 115200 8N1 on the UART console, and USB CDC on the native port if `
 | `t` | When | Fields |
 |---|---|---|
 | `hello` | once after radio up | `fw`, `board`, `salted` (always true), `channels`, `dwell_ms` |
-| `census` | every `PERCH_REPORT_MS` | see frame-model doc |
+| `census` | every `PERCH_REPORT_MS` | channel, rates, `ch_counts` (last completed dwell per channel, length 13), SSID list |
 | `hop` | on channel change, only if verbose | `ch` |
 | `fault` | init failure | `msg` |
 

@@ -43,6 +43,23 @@ button[disabled] { opacity: 0.5; cursor: default; }
 .stats div { border-top: 2px solid var(--ink); padding-top: 8px; }
 .stats span { display: block; font-size: 12px; color: var(--slate); }
 .stats strong { font-size: 22px; }
+.bars {
+  max-width: 880px;
+  margin: 0 auto 18px;
+  padding: 0 20px;
+  display: grid;
+  grid-template-columns: repeat(13, 1fr);
+  gap: 6px;
+  align-items: end;
+  height: 92px;
+}
+.bars div { display: flex; flex-direction: column; justify-content: end; height: 100%; }
+.bars i {
+  display: block;
+  background: var(--ink);
+  min-height: 2px;
+}
+.bars span { display: block; text-align: center; font-size: 11px; color: var(--slate); margin-top: 4px; }
 table { width: calc(100% - 40px); border-collapse: collapse; margin-bottom: 24px; }
 th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
 th { font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--slate); }

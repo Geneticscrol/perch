@@ -10,6 +10,10 @@
 #include "mbedtls/sha256.h"
 #include "config.h"
 
+#if PERCH_LOG_TO_FS
+#include <LittleFS.h>
+#endif
+
 struct Sta {
   char hash[9];
   int8_t rssi;
@@ -33,6 +37,8 @@ static uint8_t channel = 1;
 static Sta stas[PERCH_MAX_STATIONS];
 static SsidRow ssids[PERCH_MAX_SSIDS];
 static volatile uint32_t beacons, probes, otherMgmt;
+static uint32_t dwellFrames;
+static uint16_t chCounts[PERCH_CHANNELS];
 static uint32_t windowStart;
 static uint32_t nextHop;
 static uint32_t nextReport;
@@ -149,6 +155,7 @@ static void promiscCb(void *buf, wifi_promiscuous_pkt_type_t type) {
   if ((fc & 0x000c) != 0) return;
   uint8_t subtype = (fc >> 4) & 0x0f;
   ledHold = true;
+  dwellFrames++;
   if (subtype != 8 && subtype != 4 && subtype != 5) {
     otherMgmt++;
     return;
@@ -183,27 +190,60 @@ static int liveStations() {
   return n;
 }
 
+static void logCensus(const char *line) {
+#if PERCH_LOG_TO_FS
+  if (!LittleFS.exists("/census.log")) {
+    File created = LittleFS.open("/census.log", "w");
+    created.close();
+  }
+  File f = LittleFS.open("/census.log", "a");
+  if (!f) return;
+  if (f.size() > PERCH_LOG_MAX_BYTES) {
+    f.close();
+    LittleFS.remove("/census.log.1");
+    LittleFS.rename("/census.log", "/census.log.1");
+    f = LittleFS.open("/census.log", "w");
+    if (!f) return;
+  }
+  f.println(line);
+  f.close();
+#else
+  (void)line;
+#endif
+}
+
 static void emitCensus() {
   uint32_t now = millis();
   float dt = (now - windowStart) / 1000.0f;
   if (dt < 0.2f) dt = 0.2f;
   float rate = (beacons + probes + otherMgmt) / dt;
-  Serial.printf("{\"t\":\"census\",\"uptime_s\":%lu,\"ch\":%u,\"dwell_ms\":%d,"
-                "\"mgmt_rate\":%.1f,\"beacons\":%lu,\"probes\":%lu,"
-                "\"other_mgmt\":%lu,\"stations\":%d,\"ssids\":[",
-                now / 1000, channel, PERCH_DWELL_MS, rate,
-                (unsigned long)beacons, (unsigned long)probes,
-                (unsigned long)otherMgmt, liveStations());
+  char line[900];
+  int n = snprintf(line, sizeof line,
+                   "{\"t\":\"census\",\"uptime_s\":%lu,\"ch\":%u,\"dwell_ms\":%d,"
+                   "\"mgmt_rate\":%.1f,\"beacons\":%lu,\"probes\":%lu,"
+                   "\"other_mgmt\":%lu,\"stations\":%d,\"ch_counts\":[",
+                   now / 1000, channel, PERCH_DWELL_MS, rate,
+                   (unsigned long)beacons, (unsigned long)probes,
+                   (unsigned long)otherMgmt, liveStations());
+  for (int i = 0; i < PERCH_CHANNELS && n > 0 && n < (int)sizeof line; i++) {
+    n += snprintf(line + n, sizeof line - n, "%s%u", i ? "," : "", chCounts[i]);
+  }
+  if (n > 0 && n < (int)sizeof line) {
+    n += snprintf(line + n, sizeof line - n, "],\"ssids\":[");
+  }
   bool first = true;
-  for (int i = 0; i < PERCH_MAX_SSIDS; i++) {
+  for (int i = 0; i < PERCH_MAX_SSIDS && n > 0 && n < (int)sizeof line - 48; i++) {
     if (!ssids[i].used) continue;
-    Serial.printf("%s{\"ssid\":\"%s\",\"ch\":%u,\"rssi\":%d,\"hidden\":%s,\"ht\":%s,\"bss\":\"%s\"}",
+    n += snprintf(line + n, sizeof line - n,
+                  "%s{\"ssid\":\"%s\",\"ch\":%u,\"rssi\":%d,\"hidden\":%s,\"ht\":%s,\"bss\":\"%s\"}",
                   first ? "" : ",", ssids[i].ssid, ssids[i].ch, ssids[i].rssi,
                   ssids[i].hidden ? "true" : "false",
                   ssids[i].ht ? "true" : "false", ssids[i].bss);
     first = false;
   }
-  Serial.println("]}");
+  if (n > 0 && n < (int)sizeof line) snprintf(line + n, sizeof line - n, "]}");
+  Serial.println(line);
+  logCensus(line);
   beacons = probes = otherMgmt = 0;
   windowStart = now;
 }
@@ -212,6 +252,13 @@ void setup() {
   Serial.begin(115200);
   delay(200);
   pinMode(PERCH_LED_PIN, OUTPUT);
+#if PERCH_FPGA_STROBE
+  pinMode(PERCH_FPGA_STROBE_PIN, OUTPUT);
+  digitalWrite(PERCH_FPGA_STROBE_PIN, LOW);
+#endif
+#if PERCH_LOG_TO_FS
+  LittleFS.begin(true);
+#endif
   for (int i = 0; i < 16; i++) salt[i] = (uint8_t)esp_random();
 
   WiFi.mode(WIFI_STA);
@@ -237,6 +284,10 @@ void setup() {
 void loop() {
   uint32_t now = millis();
   if (!PERCH_LOCK_CHANNEL && now - nextHop >= PERCH_DWELL_MS) {
+    if (channel >= 1 && channel <= PERCH_CHANNELS) {
+      chCounts[channel - 1] = dwellFrames > 65535 ? 65535 : dwellFrames;
+    }
+    dwellFrames = 0;
     channel = (channel % PERCH_CHANNELS) + 1;
     esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
     nextHop = now;
@@ -248,7 +299,13 @@ void loop() {
   if (ledHold) {
     ledHold = false;
     digitalWrite(PERCH_LED_PIN, HIGH);
+#if PERCH_FPGA_STROBE
+    digitalWrite(PERCH_FPGA_STROBE_PIN, HIGH);
+#endif
     delay(20);
     digitalWrite(PERCH_LED_PIN, LOW);
+#if PERCH_FPGA_STROBE
+    digitalWrite(PERCH_FPGA_STROBE_PIN, LOW);
+#endif
   }
 }

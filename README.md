@@ -27,13 +27,15 @@ Plug the board in. It hops Wi-Fi channels 1–13, listens to 802.11 management f
 
 ## Features
 
-| | v0.1 |
+| | v0.2 |
 |---|---|
 | Management frames only | Beacon, probe request, probe response. Filter set once, not widened |
 | No transmit path | No `esp_wifi_connect`, no active scan, no `esp_wifi_80211_tx` |
-| Channel census | Round-robin dwell on channels 1–13 (channel 14 is not used) |
+| Channel census | Round-robin dwell on channels 1-13. `ch_counts` keeps the last full dwell on every channel |
 | Salted station count | SHA-256 with a boot-time salt. The salt dies on reset. No raw address on the wire |
 | Status LED (GPIO21) | Blinks when a management frame is accepted |
+| FPGA strobe | GPIO14 pulse, off unless `PERCH_FPGA_STROBE` is 1. Bitstream is built in Go Configure |
+| Ring log | LittleFS `/census.log`, off unless `PERCH_LOG_TO_FS` is 1 |
 | Laptop viewer | [`host/perch_console.py`](host/perch_console.py) — rolling SSID table over serial |
 | Browser viewer | [`companion/`](companion/) — Web Serial census (Chrome / Edge) |
 | Two build paths | Arduino IDE or PlatformIO for the sketch. ESP-IDF kept under `firmware/` for the same posture |
@@ -99,10 +101,10 @@ The same receive-only posture, as an IDF project, lives in [`firmware/`](firmwar
 A census line looks like this:
 
 ```json
-{"t":"census","uptime_s":12,"ch":6,"dwell_ms":300,"mgmt_rate":18.4,"beacons":11,"probes":4,"other_mgmt":1,"stations":7,"ssids":[{"ssid":"lab-ap","ch":6,"rssi":-47,"hidden":false,"ht":true,"bss":"a1b2c3d4"}]}
+{"t":"census","uptime_s":12,"ch":6,"dwell_ms":300,"mgmt_rate":18.4,"beacons":11,"probes":4,"other_mgmt":1,"stations":7,"ch_counts":[2,0,1,0,0,14,3,0,0,0,1,0,0],"ssids":[{"ssid":"lab-ap","ch":6,"rssi":-47,"hidden":false,"ht":true,"bss":"a1b2c3d4"}]}
 ```
 
-`bss` is a salted hash, not the BSSID. `stations` is a count of unexpired hashes. `mgmt_rate` is management frames per second, not airtime.
+`bss` is a salted hash, not the BSSID. `stations` is a count of unexpired hashes. `ch_counts` is the last completed dwell on channels 1–13, so a quiet channel stays visible after the hopper has moved on. `mgmt_rate` is management frames per second, not airtime.
 
 | Viewer | Where |
 |---|---|
@@ -155,6 +157,9 @@ Arduino settings live in [`firmware/Perch/config.h`](firmware/Perch/config.h):
 | `PERCH_CHANNELS` | 13 | 1 through 13, India plan |
 | `PERCH_LOCK_CHANNEL` | 0 | set to 1–13 to stop hopping |
 | `PERCH_LED_PIN` | 21 | ShrikeFi MCU LED |
+| `PERCH_FPGA_STROBE` | 0 | set to 1 after the stretcher bitstream is loaded |
+| `PERCH_FPGA_STROBE_PIN` | 14 | header GPIO wired to the FPGA activity input |
+| `PERCH_LOG_TO_FS` | 0 | set to 1 to append census lines to LittleFS |
 | `PERCH_LOG_PROBES` | 0 | directed probe SSIDs stay off the log |
 
 ## Limitations
@@ -171,9 +176,9 @@ Arduino settings live in [`firmware/Perch/config.h`](firmware/Perch/config.h):
 - [x] Receive-only management census, salted station count, JSON stream.
 - [x] Arduino sketch and PlatformIO environments.
 - [x] Serial companion (Web Serial) and `host/perch_console.py`.
-- [ ] FPGA user LED (FPGA GPIO16) tracking the activity strobe, bitstream in Go Configure.
-- [ ] Per-channel bar that survives a full hop, not just the current dwell.
-- [ ] Optional LittleFS ring log. Off by default so a long dwell does not leave a residue.
+- [x] Per-channel dwell counts (`ch_counts`) that survive the hop, drawn in the companion and the host console.
+- [x] Optional LittleFS ring log, off by default (`PERCH_LOG_TO_FS`).
+- [ ] FPGA user LED. Strobe pin and Verilog are in the tree. The SLG47910 bitstream still has to be built in Go Configure and loaded with ShrikeFlash.
 - [ ] Photo of a live census in `docs/images/`.
 
 ## Repository layout
